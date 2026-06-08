@@ -1,0 +1,325 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis, uuidOssp(map: "uuid-ossp")]
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  BARBER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+  TERMINATED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ShopStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum SubscriptionPlan {
+  MONTHS_3
+  MONTHS_6
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────
+
+model User {
+  id                String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  firstName         String     @map("first_name")
+  lastName          String     @map("last_name")
+  email             String     @unique
+  phoneNumber       String?    @unique @map("phone_number")
+  passwordHash      String     @map("password_hash")
+  otp               String?
+  otpExpiresAt      DateTime?  @map("otp_expires_at")
+  role              UserRole   @default(CUSTOMER)
+  status            UserStatus @default(ACTIVE)
+  gender            String?
+  dateOfBirth       DateTime?  @map("date_of_birth") @db.Date
+  profilePictureUrl String?    @map("profile_picture_url")
+  address           String?
+  pincode           String?
+  isEmailVerified   Boolean    @default(false) @map("is_email_verified")
+  isPhoneVerified   Boolean    @default(false) @map("is_phone_verified")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  deletedAt         DateTime?  @map("deleted_at")
+
+  sessions          Session[]
+  customerProfile   CustomerProfile?
+  barberProfile     BarberProfile?
+  ownedShops        BarberShop[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// SESSIONS
+// ─────────────────────────────────────────────
+
+model Session {
+  id               String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  sessionToken     String   @unique @map("session_token")
+  refreshTokenHash String   @unique @map("refresh_token_hash")
+  deviceInfo       String?  @map("device_info")
+  ipAddress        String?  @map("ip_address")
+  isRevoked        Boolean  @default(false) @map("is_revoked")
+  expiresAt        DateTime @map("expires_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  lastUsedAt       DateTime @default(now()) @map("last_used_at")
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMER PROFILE
+// ─────────────────────────────────────────────
+
+model CustomerProfile {
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId            String    @unique @map("user_id") @db.Uuid
+  desiredDistanceKm Float     @default(5.0) @map("desired_distance_km")
+  locationLat       Float?    @map("location_lat")
+  locationLng       Float?    @map("location_lng")
+  locationUpdatedAt DateTime? @map("location_updated_at")
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments      Appointment[]
+
+  @@map("customer_profiles")
+}
+
+// ─────────────────────────────────────────────
+// BARBER SHOPS
+// ─────────────────────────────────────────────
+
+model BarberShop {
+  id           String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  ownerId      String     @map("owner_id") @db.Uuid
+  shopName     String     @map("shop_name")
+  description  String?
+  address      String
+  pincode      String
+  city         String
+  state        String
+  locationLat  Float      @map("location_lat")
+  locationLng  Float      @map("location_lng")
+  avgRating    Float      @default(0.0) @map("avg_rating")
+  totalReviews Int        @default(0) @map("total_reviews")
+  isVerified   Boolean    @default(false) @map("is_verified")
+  isOpen       Boolean    @default(true) @map("is_open")
+  status       ShopStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  owner         User            @relation(fields: [ownerId], references: [id])
+  barbers       BarberProfile[]
+  shopHours     ShopHour[]
+  services      Service[]
+  appointments  Appointment[]
+  reviews       Review[]
+  subscriptions Subscription[]
+
+  @@index([city])
+  @@index([pincode])
+  @@map("barber_shops")
+}
+
+// ─────────────────────────────────────────────
+// BARBER PROFILE
+// ─────────────────────────────────────────────
+
+model BarberProfile {
+  id              String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId          String     @unique @map("user_id") @db.Uuid
+  shopId          String?    @map("shop_id") @db.Uuid
+  bio             String?
+  avgRating       Float      @default(0.0) @map("avg_rating")
+  totalReviews    Int        @default(0) @map("total_reviews")
+  experienceYears Int        @default(0) @map("experience_years")
+  isAvailable     Boolean    @default(true) @map("is_available")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop         BarberShop? @relation(fields: [shopId], references: [id])
+  appointments Appointment[]
+
+  @@map("barber_profiles")
+}
+
+// ─────────────────────────────────────────────
+// SHOP HOURS
+// ─────────────────────────────────────────────
+
+model ShopHour {
+  id        String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  shopId    String     @map("shop_id") @db.Uuid
+  dayOfWeek Int        @map("day_of_week") // 0 = Monday, 6 = Sunday
+  opensAt   String     @map("opens_at")    // "09:00"
+  closesAt  String     @map("closes_at")   // "20:00"
+  isClosed  Boolean    @default(false) @map("is_closed")
+
+  shop      BarberShop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, dayOfWeek])
+  @@map("shop_hours")
+}
+
+// ─────────────────────────────────────────────
+// SERVICES
+// ─────────────────────────────────────────────
+
+model Service {
+  id              String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  shopId          String     @map("shop_id") @db.Uuid
+  name            String
+  description     String?
+  price           Float
+  durationMinutes Int        @map("duration_minutes")
+  isActive        Boolean    @default(true) @map("is_active")
+
+  shop         BarberShop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@map("services")
+}
+
+// ─────────────────────────────────────────────
+// APPOINTMENTS
+// ─────────────────────────────────────────────
+
+model Appointment {
+  id                 String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  customerId         String            @map("customer_id") @db.Uuid
+  barberId           String            @map("barber_id") @db.Uuid
+  shopId             String            @map("shop_id") @db.Uuid
+  serviceId          String            @map("service_id") @db.Uuid
+  scheduledAt        DateTime          @map("scheduled_at")
+  durationMinutes    Int               @map("duration_minutes")
+  priceAtBooking     Float             @map("price_at_booking")
+  status             AppointmentStatus @default(PENDING)
+  cancellationReason String?           @map("cancellation_reason")
+  cancelledAt        DateTime?         @map("cancelled_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  customer CustomerProfile @relation(fields: [customerId], references: [id])
+  barber   BarberProfile   @relation(fields: [barberId], references: [id])
+  shop     BarberShop      @relation(fields: [shopId], references: [id])
+  service  Service         @relation(fields: [serviceId], references: [id])
+  review   Review?
+
+  @@index([customerId])
+  @@index([barberId])
+  @@index([shopId])
+  @@index([scheduledAt])
+  @@map("appointments")
+}
+
+// ─────────────────────────────────────────────
+// REVIEWS
+// ─────────────────────────────────────────────
+
+model Review {
+  id            String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  appointmentId String     @unique @map("appointment_id") @db.Uuid
+  customerId    String     @map("customer_id") @db.Uuid
+  shopId        String     @map("shop_id") @db.Uuid
+  barberId      String     @map("barber_id") @db.Uuid
+  shopRating    Int        @map("shop_rating")   // 1-5
+  barberRating  Int        @map("barber_rating") // 1-5
+  comment       String?
+  isFlagged     Boolean    @default(false) @map("is_flagged")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  barberShop    BarberShop @relation(fields: [shopId], references: [id])
+
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([shopId])
+  @@index([barberId])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// SUBSCRIPTIONS
+// ─────────────────────────────────────────────
+
+model Subscription {
+  id         String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  shopId     String             @map("shop_id") @db.Uuid
+  plan       SubscriptionPlan
+  amountPaid Float              @map("amount_paid")
+  paymentId  String             @unique @map("payment_id")
+  status     SubscriptionStatus @default(ACTIVE)
+  startsAt   DateTime           @map("starts_at")
+  expiresAt  DateTime           @map("expires_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  shop BarberShop @relation(fields: [shopId], references: [id])
+
+  @@index([shopId])
+  @@map("subscriptions")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String
+  tableName String   @map("table_name")
+  recordId  String?  @map("record_id")
+  oldValues Json?    @map("old_values")
+  newValues Json?    @map("new_values")
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([tableName])
+  @@map("audit_logs")
+}
