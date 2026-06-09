@@ -90,13 +90,7 @@ export const signup = async (req: Request, res: Response) => {
         userId: newuser.id
       }
     })
-  } else if (role === 'BARBER') {
-    await tx.barberProfile.create({
-      data: {
-        userId: newuser.id
-      }
-    })
-  }
+  } 
 
   return newuser
  })

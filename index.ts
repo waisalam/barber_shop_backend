@@ -4,6 +4,7 @@ import dotenv from "dotenv"
 import rateLimit from "express-rate-limit"
 import helmet from 'helmet'
 import authRoutes from './routes/auth.routes.js'
+import shopRoutes from './routes/shop.routes.js'
 dotenv.config()
 
 
@@ -20,6 +21,7 @@ app.use(rateLimit({
 }))
 
 app.use('/api/auth', authRoutes)
+app.use('/api/shop',shopRoutes)
 
 app.get('/health', (req, res)=>{
     res.json({status: 'ok'})

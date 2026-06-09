@@ -173,6 +173,7 @@ model BarberProfile {
   id              String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   userId          String     @unique @map("user_id") @db.Uuid
   shopId          String?    @map("shop_id") @db.Uuid
+  name            String     @map("name")
   bio             String?
   avgRating       Float      @default(0.0) @map("avg_rating")
   totalReviews    Int        @default(0) @map("total_reviews")
