@@ -5,8 +5,9 @@ import rateLimit from "express-rate-limit"
 import helmet from 'helmet'
 import authRoutes from './routes/auth.routes.js'
 import shopRoutes from './routes/shop.routes.js'
+import appointmentRoutes from './routes/appointment.routes.js'
+import reviewRoutes from './routes/review.routes.js'
 dotenv.config()
-
 
 const app = express()
 
@@ -22,6 +23,8 @@ app.use(rateLimit({
 
 app.use('/api/auth', authRoutes)
 app.use('/api/shop',shopRoutes)
+app.use('/api/appointment', appointmentRoutes)
+app.use('/api/review', reviewRoutes)
 
 app.get('/health', (req, res)=>{
     res.json({status: 'ok'})
