@@ -160,15 +160,15 @@ export const verify = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = await req.body;
+    const { phoneNum, password } = await req.body;
 
-    if (!email || !password) {
+    if (!phoneNum || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
     const user = await prisma.user.findUnique({
       where: {
-        email,
+        phoneNumber: phoneNum,
       },
     });
     if (!user) {
