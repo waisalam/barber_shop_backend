@@ -187,6 +187,15 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+
+    await prisma.user.update({
+      where:{
+        id: user.id 
+      },
+      data: {
+        isFirstTimeUser : false
+      }
+    })
 // 6. Generate access token (short lived)
     const accessToken = jwt.sign(
       { userId: user.id, role: user.role },
